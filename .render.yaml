@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: insta-api
+    runtime: node
+    buildCommand: "npm install && pip install -r requirements.txt"
+    startCommand: "npm start"
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "true"
