@@ -1,29 +1,47 @@
-// server.js
 const express = require("express");
-const { exec } = require("child_process");
+const axios = require("axios");
+const cheerio = require("cheerio");
+
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.get("/download", (req, res) => {
-  const url = req.query.url;
+app.get("/scrape", async (req, res) => {
+  const inputUrl = req.query.url;
 
-  if (!url || !url.includes("instagram.com")) {
-    return res.status(400).send("Invalid URL");
+  if (!inputUrl || !inputUrl.includes("instagram.com")) {
+    return res.status(400).json({ error: "Invalid Instagram URL" });
   }
 
-  const cleanUrl = url.split("?")[0]; // 💥 ตัดพวก ?igsh=... ออก
-  const cmd = `instaloader --no-captions --no-metadata-json --dirname-pattern=downloads ${cleanUrl}`;
+  // ลบ query string เช่น ?igshid=...
+  const cleanUrl = inputUrl.split("?")[0];
 
-  exec(cmd, (error, stdout, stderr) => {
-    if (error) {
-      console.error("Error:", error.message);
-      return res.status(500).send(`Download failed: ${error.message}`);
-    }
+  try {
+    const response = await axios.get(cleanUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      },
+    });
 
-    res.send("Download complete (saved in server folder)");
-  });
+    const $ = cheerio.load(response.data);
+
+    const videoUrl = $('meta[property="og:video"]').attr("content") || null;
+    const imageUrl = $('meta[property="og:image"]').attr("content") || null;
+    const title = $('meta[property="og:title"]').attr("content") || "";
+    const description = $('meta[property="og:description"]').attr("content") || "";
+
+    res.json({
+      success: true,
+      title,
+      description,
+      video: videoUrl,
+      image: imageUrl,
+    });
+  } catch (err) {
+    console.error("Scrape failed:", err.message);
+    res.status(500).json({ error: "Scrape failed" });
+  }
 });
 
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`✅ Server running on http://localhost:${port}`);
 });
